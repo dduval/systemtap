@@ -1,0 +1,42 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ * 
+ * tasklockdepthv2.stp :
+ *
+ * Uses the profile probe to find processes that hold the BKL.
+ *
+ * Note: Requires the use of guru mode (-g)
+ *
+ * USAGE: stap -g tasklockdepthv2.stp
+ *
+ */
+
+global start
+
+function getlockdepth:long()
+%{ /* pure */
+	THIS->__retvalue = current->lock_depth;
+
+%}
+
+probe begin {
+        start = gettimeofday_us()
+	printf("%s \n", "Starting script.")
+}
+
+function timestamp:long() {
+        return gettimeofday_us() - start
+}
+
+probe timer.profile {
+	fn = probefunc ()
+	ld = getlockdepth()
+	if ( fn != "mwait_idle" && ld >= 0 )
+		printf("[CPU %d] At %d us , PID: %8d (%20s) Depth: %d Function: %32s \n", cpu(), timestamp(), pid(), execname(), getlockdepth(), fn)
+}
+
+probe timer.ms(120000) {
+        exit()
+}
+
