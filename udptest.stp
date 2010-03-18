@@ -1,0 +1,68 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ * 
+ * Describe incoming and outcoming UDP traffic.
+ *
+ * Incomplete.
+ *
+ * USAGE: stap udptest.stp
+ *
+ */
+
+
+global udp_out, udp_outerr, udp_in, udp_inerr, udp_noport, lines, rcv_err
+
+probe begin {
+        lines = 20
+        printf("%11s  %10s  %10s  %10s  %10s\n",
+                "UDP_out", "UDP_outErr", "UDP_in", "UDP_inErr", "UDP_noPort")
+}
+
+probe kernel.function("udp_sendmsg").return
+{
+        $return >= 0 ? udp_out++ : udp_outerr++
+}
+
+probe kernel.function("udp_queue_rcv_skb").return
+{
+        $return == 0 ? udp_in++ : udp_inerr++
+	if ($return != 0 ) {
+		rcv_err[$return] ++
+		if ( $sk->sk_rmem_alloc->counter + $skb->truesize >=  $sk->sk_rcvbuf)
+			printf("ENOMEM: ")
+		printf("sk->sk_rmem_alloc=%10d skb->truesize=%10d sk->sk_rcvbuf=%10d\n", $sk->sk_rmem_alloc->counter, $skb->truesize, $sk->sk_rcvbuf)
+	}
+}
+
+probe kernel.function("icmp_send")
+{
+        /* icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0); */
+        if ($type == 3 && $code == 3) {
+                /* IPPROTO_UDP = 17 */
+                if ($skb_in->nh->iph->protocol == 17)
+                        udp_noport++
+        }
+}
+
+probe timer.ms(500)
+{
+        if (lines-- <= 0) {
+                printf("%11s  %10s  %10s  %10s %10s\n",
+                        "UDP_out", "UDP_outErr", "UDP_in", "UDP_inErr", "UDP_noPort")
+                lines = 20
+        }
+        printf("%11d  %10d  %10d  %10d  %10d\n",
+                udp_out, udp_outerr, udp_in, udp_inerr, udp_noport)
+}
+
+
+probe end
+{
+
+foreach ([err] in rcv_err) {
+    printf("udp_queue_rcv_skb() errors:\n")
+    printf("%8d %8d\n", err, rcv_err[err])
+  }
+
+}

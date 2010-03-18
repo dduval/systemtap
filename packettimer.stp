@@ -1,0 +1,33 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ * 
+ * Determine for how long incoming multicast packets stay in the
+ * TCP/IP stack before they hit the application.
+ *
+ * USAGE: stap packettimer.stp
+ *
+ */
+
+
+probe begin {
+}
+
+probe netdev.receive 
+{
+	if ( $skb->pkt_type == 2) { /* PACKET_MULTICAST */
+		printf("IN: Device %s, time=%d us\n",dev_name, gettimeofday_us())
+	} 
+}
+
+probe kernel.function("sock_recvmsg").return
+{
+		printf("OUT: time=%d us\n", gettimeofday_us())
+
+}
+
+/* Make sure we exit after 5 seconds, just in case... */
+probe timer.ms(5000)
+{
+	exit()
+}

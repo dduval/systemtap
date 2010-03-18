@@ -1,0 +1,55 @@
+/*
+ * Copyright (C) 2009 Dominic Duval, Red Hat Inc.
+ * 
+ * pingSysRq.stp : 
+ * Crash a box remotely by probing the ICMP packet handler.
+ * 'ping -p 1 <ipaddr>' can be used to trigger the probe.
+ *
+ * USAGE: stap -g pingSysRq.stp
+ *
+ */
+
+%{
+#include <linux/mm.h>
+%}
+
+function pingsysrq_showmem () %{
+
+	show_mem();
+
+%}
+
+
+function pingsysrq_panic () %{
+	printk("CRASHDUMP\n"); 
+	int *i;
+	i = 0;
+	printk ("i=%d\n", *i);
+%}
+
+probe kernel.function("icmp_echo")
+{
+	/* Get one byte out of the 16 ICMP pad values */
+	key = kernel_char($skb->data + 16 )
+
+	printf("%d ",kernel_char($skb->data + 16 ));
+	/* Panic is 0x01 */
+	if (key & 1) { 
+		print("Key 1")
+		pingsysrq_panic();
+		exit()
+	}
+	
+	/* Something else in the future... */
+	if (key & 2) {
+		print("Key 2")
+		pingsysrq_showmem()
+
+	}
+	if (key & 4 ) {
+		print("Key 4")
+
+	}
+
+}
+

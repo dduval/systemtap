@@ -1,0 +1,42 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ * 
+ * tasktimer.stp :
+ *
+ * Determine for how long specific tasks are running
+ *
+ * USAGE: stap tasktimer.stp [processname]
+ *
+ * Optionally, add -D MAXMAPENTRIES=16385 if the script is producing errors:
+ * stap -D MAXMAPENTRIES=16384 tasktimer.stp [processname]
+ *
+ */
+
+global createtime, exittime
+
+probe begin {
+	printf("Timing %s processes.\n", @1)
+}
+
+probe process.create {
+
+	/* printf( "create, pid=%d\n", new_pid) */
+	createtime[new_pid] = gettimeofday_us()
+
+}
+
+probe process.exit {
+	
+	if (execname()==@1) {
+		exittime[pid()] = gettimeofday_us()
+		 printf("PID %d (%s) %d us \n ", pid(), @1, exittime[pid()]-createtime[pid()])
+		delete createtime[pid()]
+		delete exittime[pid()]
+	}
+}
+
+probe end {
+	printf("Ending script.\n")
+}
+

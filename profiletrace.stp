@@ -1,0 +1,31 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ * 
+ * Profile the kernel.
+ *
+ * USAGE: stap profiletrace.stp
+ *
+ */
+
+global profile, pcount, mscount
+probe timer.profile {
+  pcount ++
+  fn = probefunc ()
+  if (fn != "" && fn != "mwait_idle") profile[fn, backtrace(), execname()] ++ 
+}
+
+probe timer.ms(10000) {
+  mscount = gettimeofday_ms() - (1000*gettimeofday_s())
+  printf ("\n%s %d\n", ctime(gettimeofday_s()), mscount )
+  printf ("\n--- %d samples recorded:\n", pcount)
+  foreach ([fn, trace, pname] in profile- limit 20) {
+    printf ("%25s %25s\t%d\n", pname, fn, profile[fn,trace,pname])
+    print_stack(trace)
+  }
+  delete profile
+  pcount = 0
+} 
+
+
+

@@ -1,0 +1,94 @@
+/*
+ * Copyright (C) 2009 Dominic Duval, Red Hat Inc.
+ * 
+ * nfsumount_timer.stp : Prints the time spent in functions
+ * called in the sys_umount() path with a special attention to
+ * NFS-related calls.
+ *
+ * USAGE: stap nfsumount_timer.stp
+ *
+ */
+
+global entrysec, entryms
+
+
+function collect_entry() { 
+	entryms[probefunc(),pid()] = gettimeofday_ms()
+	entrysec[probefunc(),pid()] = gettimeofday_s()
+}
+
+function collect_exit() {	
+        printf("%s : %d ms\n", probefunc(), (gettimeofday_s()-entrysec[probefunc(),pid()] )*1000 + (gettimeofday_ms() - entryms[probefunc(),pid()]) )
+}
+
+probe kernel.function("sys_umount") { collect_entry(); }
+probe kernel.function("sys_umount").return { collect_exit(); }
+
+probe kernel.function("umount_tree") { collect_entry(); }
+probe kernel.function("umount_tree").return { collect_exit(); }
+
+probe kernel.function("detach_mnt") { collect_entry(); }
+probe kernel.function("detach_mnt").return { collect_exit(); }
+
+//Disabled - too much traffic
+//probe kernel.function("path_release") { collect_entry(); }
+//probe kernel.function("path_release").return { collect_exit(); }
+
+//Disabled - too much traffic
+//probe kernel.function("dput") { collect_entry(); }
+//probe kernel.function("dput").return { collect_exit(); }
+
+probe kernel.function("free_vfsmnt") { collect_entry(); }
+probe kernel.function("free_vfsmnt").return { collect_exit(); }
+
+probe kernel.function("deactivate_super") { collect_entry(); }
+probe kernel.function("deactivate_super").return { collect_exit(); }
+
+probe kernel.function("put_super") { collect_entry(); }
+probe kernel.function("put_super").return { collect_exit(); }
+
+probe kernel.function("put_filesystem") { collect_entry(); }
+probe kernel.function("put_filesystem").return { collect_exit(); }
+
+probe kernel.function("kill_anon_super") { collect_entry(); }
+probe kernel.function("kill_anon_super").return { collect_exit(); }
+
+probe kernel.function("generic_shutdown_super") { collect_entry(); }
+probe kernel.function("generic_shutdown_super").return { collect_exit(); }
+
+probe kernel.function("invalidate_inodes") { collect_entry(); }
+probe kernel.function("invalidate_inodes").return { collect_exit(); }
+
+probe kernel.function("invalidate_list") { collect_entry(); }
+probe kernel.function("invalidate_list").return { collect_exit(); }
+
+probe kernel.function("invalidate_all_mapping_pages") { collect_entry(); }
+probe kernel.function("invalidate_all_mapping_pages").return { collect_exit(); }
+
+//Too much traffic for this
+//probe kernel.function("invalidate_inode_buffers") { collect_entry(); }
+//probe kernel.function("invalidate_inode_buffers").return { collect_exit(); }
+
+//NFS Specific functions:
+probe module("nfs").function("nfs_umount_begin") { collect_entry(); }
+probe module("nfs").function("nfs_umount_begin").return { collect_exit(); }
+
+probe module("nfs").function("nfs_kill_super") { collect_entry(); }
+probe module("nfs").function("nfs_kill_super").return { collect_exit(); }
+
+//sunrpc functions:
+probe module("sunrpc").function("rpc_shutdown_client") { collect_entry(); }
+probe module("sunrpc").function("rpc_shutdown_client").return { collect_exit(); }
+
+probe module("sunrpc").function("rpciod_down") { collect_entry(); }
+probe module("sunrpc").function("rpciod_down").return { collect_exit(); }
+
+//Stuff invoked under lockd_down() 
+probe module("lockd").function("lockd_down") { collect_entry(); }
+probe module("lockd").function("lockd_down").return { collect_exit(); }
+
+
+probe kernel.function("kill_proc") { collect_entry(); }
+probe kernel.function("kill_proc").return { collect_exit(); }
+
+

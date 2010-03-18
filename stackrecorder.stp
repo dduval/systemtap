@@ -1,0 +1,44 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ * 
+ * Collect information about the context in which the
+ * link_path_walk() function is called in the kernel.
+ *
+ * USAGE: stap stackrecorder.stp
+ *
+ */
+
+
+
+global min_free_stack, pid2name
+
+probe begin {
+        print("Collecting stack data... Type Ctrl-C to exit and display results\n")
+}
+
+probe kernel.function("link_path_walk").return {
+	pid = pid()
+
+	if (!(pid in pid2name)) pid2name[pid] = execname()
+
+	if ((min_free_stack[pid]) == 0) 
+		min_free_stack[pid] = stack_unused()
+
+	if ((min_free_stack[pid]) > stack_unused() ) {
+		printf("[PID %d] From %d to %d (-%d)\n",pid, min_free_stack[pid],stack_unused(), min_free_stack[pid]-stack_unused())
+	        min_free_stack[pid] = stack_unused()
+	}
+}
+
+probe end
+{
+        printf("%-8s %-16s %-8s\n",
+               "PID", "NAME", "MIN_FREE")
+
+        foreach ([pid] in min_free_stack-) {
+                printf("%-8d %-16s %-8d\n",
+                       pid, pid2name[pid], min_free_stack[pid])
+        }
+}
+

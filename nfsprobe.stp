@@ -1,0 +1,95 @@
+/*
+ * Copyright (C) 2009 Dominic Duval, Red Hat Inc.
+ * 
+ * nfsv4probe.stp : Reports timing statistics for NFS operations on
+ * the server side.
+ *
+ * USAGE: stap nfsv4probe.stp
+ *
+ */
+
+
+global entry, times
+
+function preexec() {
+	entry[probefunc()] = gettimeofday_us() 
+}
+
+function postexec() {
+	if (probefunc() in entry)  {
+		times[probefunc()] <<< (gettimeofday_us() - entry[probefunc()])
+	}
+}
+
+probe module("nfsd").function("nfsd4_proc_compound").call { preexec() }
+probe module("nfsd").function("nfsd4_proc_compound").return { postexec() }
+
+
+/* nfsd4_access is inlined, reverting to nfsd_access() */
+probe module("nfsd").function("nfsd_access").call { preexec() }
+probe module("nfsd").function("nfsd_access").return { postexec() }
+
+probe module("nfsd").function("nfsd4_close").call { preexec() }
+probe module("nfsd").function("nfsd4_close").return { postexec() }
+
+/* nfsd4_commit is inlined, reverting to nfsd_commit() */
+probe module("nfsd").function("nfsd_commit").call { preexec() }
+probe module("nfsd").function("nfsd_commit").return { postexec() }
+
+probe module("nfsd").function("nfsd_create").call { preexec() }
+probe module("nfsd").function("nfsd_create").return { postexec() }
+
+/* nfsd4_getattr is inlined, reverting to fh_verify() */
+probe module("nfsd").function("fh_verify").call { preexec() }
+probe module("nfsd").function("fh_verify").return { postexec() }
+
+/* nfsd4_link is inlined, reverting to nfsd_link() */
+probe module("nfsd").function("nfsd_link").call { preexec() }
+probe module("nfsd").function("nfsd_link").return { postexec() }
+
+/* Got inlined...forget it for now */
+/* probe module("nfsd").function("nfsd4_lookupp").call { preexec() } */
+/* probe module("nfsd").function("nfsd4_lookupp").return { postexec() } */
+
+/* nfsd4_lookup is inlined, reverting to nfsd_lookup() */
+probe module("nfsd").function("nfsd_lookup").call { preexec() }
+probe module("nfsd").function("nfsd_lookup").return { postexec() }
+
+probe module("nfsd").function("nfsd4_encode_operation").call { preexec() }
+probe module("nfsd").function("nfsd4_encode_operation").return { postexec() }
+
+/* nfsd4_remove is inlined, reverting to nfsd_unlink() */
+probe module("nfsd").function("nfsd_unlink").call { preexec() }
+probe module("nfsd").function("nfsd_unlink").return { postexec() }
+
+/* nfsd4_rename is inlined, reverting to nfsd_rename */
+probe module("nfsd").function("nfsd_rename").call { preexec() }
+probe module("nfsd").function("nfsd_rename").return { postexec() }
+
+/* nfsd4_write is inlined, reverting to nfsd_write */
+probe module("nfsd").function("nfsd_write").call { preexec() }
+probe module("nfsd").function("nfsd_write").return { postexec() }
+
+
+
+
+probe timer.s(5) { 
+	printf("           average (us) <-----------------------\\ \n")
+	printf("               max (us) <-----------------\\      \\ \n")
+	printf(" Function      min (us) <------------\\     \\      \\ \n")
+	printf("    |             count <-----\\       \\     \\      \\ \n")
+
+	foreach ([func] in times ) {
+		printf("%-30s %-6d %-6d %-6d %-6d   \n", 
+			func, 
+			@count(times[func]),
+			@min(times[func]),
+			@max(times[func]),
+			@avg(times[func]))
+	}
+
+	printf("\n\n")
+}
+
+
+

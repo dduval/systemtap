@@ -1,0 +1,46 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ *
+ * Keeps track of the amount of data transferred with the 
+ * read/write systemcalls.
+ *  
+ * USAGE: stap readwrite.stp
+ *
+ */
+
+
+global reads, writes, totals
+
+probe syscall.read.return {
+  count = $return
+  if ( count >= 0 ) {
+    e=execname();
+    reads[e] <<< count # statistics array
+    totals[e] += count
+  }
+}
+
+probe syscall.write.return {
+  count = $return
+  if (count >= 0 ) {
+    e=execname();
+    writes[e] <<< count # statistics array
+    totals[e] += count
+  }
+}
+
+probe end {
+  printf("%16s %8s %8s %8s %8s\n",
+    "process", "read", "KB tot", "write", "KB tot")
+  foreach (name in totals- limit 20) { # sort by total io
+    printf("%16s %8d %8d %8d %8d\n",
+      name,
+      @count(reads[name]),
+      (@count(reads[name]) ? @sum(reads[name])>>10 : 0 ),
+      @count(writes[name]),
+      (@count(writes[name]) ? @sum(writes[name])>>10 : 0 )
+    )
+  }
+}
+
