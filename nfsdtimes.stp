@@ -1,0 +1,47 @@
+/*
+ * Copyright (C) 2009 Dominic Duval, Red Hat Inc.
+ * 
+ * nfsdtimes.stp : Reports timing statistics for NFS operations on
+ * the server side.
+ *
+ * USAGE: stap nfsdtimes.stp
+ *
+ */
+
+
+global entry, times
+
+function preexec() {
+  entry[probefunc(), pid()] = gettimeofday_us() 
+}
+
+function postexec() {
+  p = pid()
+  if ([probefunc(), p] in entry)  {
+    times[probefunc()] <<< (gettimeofday_us() - entry[probefunc(), p])
+    delete entry[probefunc(), p]
+  }
+}
+
+
+probe nfsd.* { preexec() }
+probe nfsd.*.return { postexec() }
+
+
+probe timer.s(5) { 
+  printf("           average (us) <-----------------------\\ \n")
+  printf("               max (us) <-----------------\\      \\ \n")
+  printf(" Function      min (us) <------------\\     \\      \\ \n")
+  printf("    |             count <-----\\       \\     \\      \\ \n")
+
+  foreach ([func] in times ) {
+    printf("%-30s %-6d %-6d %-6d %-6d   \n", 
+      func, 
+      @count(times[func]),
+      @min(times[func]),
+      @max(times[func]),
+      @avg(times[func]))
+  }
+
+  printf("\n\n")
+}
