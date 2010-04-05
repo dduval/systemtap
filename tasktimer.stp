@@ -13,30 +13,27 @@
  *
  */
 
-global createtime, exittime
+global createtime
 
 probe begin {
-	printf("Timing %s processes.\n", @1)
+  printf("Timing %s processes.\n", @1)
 }
 
-probe process.create {
-
-	/* printf( "create, pid=%d\n", new_pid) */
-	createtime[new_pid] = gettimeofday_us()
+probe kprocess.create {
+  /* printf( "create, pid=%d\n", new_pid) */
+  createtime[new_pid] = gettimeofday_us()
 
 }
 
-probe process.exit {
-	
-	if (execname()==@1) {
-		exittime[pid()] = gettimeofday_us()
-		 printf("PID %d (%s) %d us \n ", pid(), @1, exittime[pid()]-createtime[pid()])
-		delete createtime[pid()]
-		delete exittime[pid()]
-	}
+probe kprocess.exit {
+  if (execname()==@1) {
+    exittime = gettimeofday_us()
+     printf("PID %d (%s) %d us\n", pid(), @1, exittime-createtime[pid()])
+  }
+  delete createtime[pid()]
 }
 
 probe end {
-	printf("Ending script.\n")
+  printf("Ending script.\n")
 }
 
