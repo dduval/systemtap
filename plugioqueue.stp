@@ -1,0 +1,31 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ *
+ * plugioqueue.stp :
+ *
+ * Plugs the I/O queue before any operation on a SCSI device, 
+ * thus rendering the SCSI request function essentially a noop.
+ *
+ * WARNING: the request queue will grow and reach limits established
+ * in the kernel. This plugs both read and write operations.
+ *
+ * USAGE: stap -g plugioqueue.stp 
+ *
+ */
+
+%{
+#include <linux/blkdev.h>
+#include <linux/elevator.h>
+%}
+
+function plug_queue(rq:long) 
+%{
+	struct request_queue *q;
+	q = (struct request_queue *)((long)THIS->rq);
+	blk_plug_device(q);
+%}
+
+probe module("scsi_mod").function("scsi_request_fn") {
+		plug_queue($q)
+}
