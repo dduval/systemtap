@@ -1,0 +1,38 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ * 
+ * Monitors how many pages were dropped from the page cache every second 
+ * and reports how the first of those pages was dropped (caller).
+ *
+ * USAGE: stap dropcache_monitor.stp
+ *
+ */
+
+global lim, ret, caller
+
+probe kernel.function("__invalidate_mapping_pages").return
+{
+	ret += $return	
+	if (lim == 0) {
+		lim=1
+		caller[backtrace()]++
+	}
+}
+
+probe begin {
+	printf("Dropped pages from the page cache:\n")
+}
+
+probe timer.s(1) {
+	printf("%d\n",ret)
+	foreach ([trace] in caller- limit 5) {
+		printf ("%d \n", caller[trace] )
+		print_stack(trace)
+		printf("\n\n")
+	}
+	ret = 0
+	lim = 0
+	delete caller
+}
+
