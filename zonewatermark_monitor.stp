@@ -1,0 +1,27 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ * 
+ * Monitor the conditions and return number under which the zone watermark
+ * function operates.
+ *
+ * USAGE: stap zonewatermark_monitor.stp
+ *
+ */
+
+
+
+probe kernel.function("zone_watermark_ok")
+{
+		
+	printf("%d %d %d %x",$z->free_pages,$order,$mark, $alloc_flags)
+}
+
+probe kernel.function("zone_watermark_ok").return
+{
+	printf(" %d\n",$return)
+}
+
+probe begin {
+	printf("free_pages order mark flags return \n")
+}

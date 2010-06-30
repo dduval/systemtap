@@ -1,0 +1,22 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ * 
+ * Monitors order-10 (4M) memory allocations and prints who called it.
+ *
+ * USAGE: stap allocpages.stp
+ *
+ * WARNING: this will add a probe to __alloc_pages(), which is heavily
+ * called in the kernel. This could significantly slow down the system
+ * so make sure this script gets tested if deployed in production environments.
+ *
+ *
+ */
+
+probe kernel.function("__alloc_pages")
+{
+	if ($order==10) {
+		printf("Order 10 allocation in __alloc_pages(), gfp_mask=0x%x. Backtrace:\n",$gfp_mask)
+		print_backtrace()
+	}
+}
