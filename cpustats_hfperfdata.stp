@@ -86,9 +86,10 @@ function get_cpustat_entry:long(subfield:long) %{ /* pure */
 
 probe begin {
 
-samplerate = $1
-reportrate = $2
-printf("Starting probe, sample rate: %d ms, report rate: %d ms .\n",samplerate, reportrate)
+	samplerate = $1
+	reportrate = $2
+	printf("Starting probe, sample rate: %d ms, report rate: %d ms .\n",samplerate, reportrate)
+	printf("date,gtod,cpu,usrmin,usrmax,usravg,usrsum,sysmin,sysmax,sysavg,syssum,idmin,idmax,idavg,idsum,irqmin,irqmax,irqavg,irqsum,iowmin,iowmax,iowavg,iowsum\n")
 }
 
 probe timer.profile {
@@ -120,26 +121,20 @@ probe timer.profile {
 }	
 
 probe timer.ms($2) {
+	foreach([cpu] in hfusr) {
+		printf("%s,%d,",ctime(gettimeofday_s()),gettimeofday_s())
+		printf("%d,", cpu)
+		printf("%d,%d,%d,%d,", @min(hfusr[cpu]), @max(hfusr[cpu]), @avg(hfusr[cpu]), @sum(hfusr[cpu]) )
+		printf("%d,%d,%d,%d,", @min(hfsys[cpu]), @max(hfsys[cpu]), @avg(hfsys[cpu]), @sum(hfsys[cpu]) )
+		printf("%d,%d,%d,%d,", @min(hfid[cpu]), @max(hfid[cpu]), @avg(hfid[cpu]), @sum(hfid[cpu]) )
+		printf("%d,%d,%d,%d,", @min(hfirq[cpu]), @max(hfirq[cpu]), @avg(hfirq[cpu]), @sum(hfirq[cpu]) )
+		printf("%d,%d,%d,%d", @min(hfiow[cpu]), @max(hfiow[cpu]), @avg(hfiow[cpu]), @sum(hfiow[cpu]) )
+   		printf("\n")
+	}
 
-  printf("date,gtod,cpu,usrmin,usrmax,usravg,usrsum,sysmin,sysmax,sysavg,syssum,idmin,idmax,idavg,idsum,irqmin,irqmax,irqavg,irqsum,iowmin,iowmax,iowavg,iowsum\n")
-  foreach([cpu] in hfusr) {
-    printf("%s,%d,",ctime(gettimeofday_s()),gettimeofday_s())
-    printf("%d,", cpu)
-
-    printf("%d,%d,%d,%d,", @min(hfusr[cpu]), @max(hfusr[cpu]), @avg(hfusr[cpu]), @sum(hfusr[cpu]) )
-    printf("%d,%d,%d,%d,", @min(hfsys[cpu]), @max(hfsys[cpu]), @avg(hfsys[cpu]), @sum(hfsys[cpu]) )
-    printf("%d,%d,%d,%d,", @min(hfid[cpu]), @max(hfid[cpu]), @avg(hfid[cpu]), @sum(hfid[cpu]) )
-    printf("%d,%d,%d,%d,", @min(hfirq[cpu]), @max(hfirq[cpu]), @avg(hfirq[cpu]), @sum(hfirq[cpu]) )
-    printf("%d,%d,%d,%d", @min(hfiow[cpu]), @max(hfiow[cpu]), @avg(hfiow[cpu]), @sum(hfiow[cpu]) )
-
-
-   printf("\n")
-   }
-   printf("\n")
-
-  delete hfusr
-  delete hfsys
-  delete hfid
-  delete hfirq
-  delete hfiow
+	delete hfusr
+	delete hfsys
+	delete hfid
+	delete hfirq
+	delete hfiow
 }
