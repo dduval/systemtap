@@ -1,0 +1,145 @@
+/*
+ * By Dominic Duval, Red Hat Inc.
+ * dduval@redhat.com
+ *
+ * cpustats_hfperfdata.stp : 
+ *
+ * Generates high-granularity CPU load statistics (user, system, idle, irq and 
+ * iowait time)
+ *
+ * USAGE: stap -g cpustats_hfperfdata.stp [snapshotdelay] [reportdelay]
+ *
+ * snapshotdelay : number of milliseconds after which a snapshot is recorded
+ * reportdelay : number of milliseconds after which a report is printed on the screen
+ *
+ * Columns reported by this script are defined as follows:
+ *
+ * date : Date and time when data was printed (in ctime format)
+ * gtod : Number of seconds after epoch when data was printed
+ * cpu : CPU number (starting at 0)
+ * usrmin,usrmax,usravg,usrsum : min, max, average and total time spent in user space (in ticks) for all snapshots in a report
+ * sysmin,sysmax,sysavg,syssum : min, max, average and total time spent in kernel space (in ticks) for all snapshots in a report
+ * idmin,idmax,idavg,idsum : min, max, average and total time spent in user space (in ticks) for all snapshots in a report
+ * irqmin,irqmax,irqavg,irqsum : min, max, average and total time spent executing IRQ handlers (in ticks) for all snapshots in a report
+ * iowmin,iowmax,iowavg,iowsum: min, max, average and total time spent in IO Wait (in ticks) for all snapshots in a report
+ *
+ * Note that the first report generated will not contain any meaningful data.
+ */
+
+
+
+%{
+#include <linux/sched.h>
+#include <linux/cpumask.h>
+#include <linux/percpu.h>
+#include <linux/kernel_stat.h>
+
+%}
+
+global last_gettimeofday_us
+global samplerate
+global reportrate
+
+global hfusr
+global hfsys
+global hfid
+global hfirq
+global hfiow
+
+global prevhfusr
+global prevhfsys
+global prevhfid
+global prevhfirq
+global prevhfiow
+
+function get_cpustat_entry:long(subfield:long) %{ /* pure */
+        static int last_usr = 0;
+        struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
+
+	switch (THIS->subfield) {
+
+	case 0:
+        	THIS->__retvalue = cpustat->user;
+		break;
+	case 1:
+        	THIS->__retvalue = cpustat->nice;
+		break;
+	case 2:
+        	THIS->__retvalue = cpustat->system;
+		break;
+	case 3:
+        	THIS->__retvalue = cpustat->softirq;
+		break;
+	case 4:
+        	THIS->__retvalue = cpustat->irq;
+		break;
+	case 5:
+        	THIS->__retvalue = cpustat->idle;
+		break;
+	case 6:
+        	THIS->__retvalue = cpustat->iowait;
+		break;
+	}
+
+%}
+
+
+probe begin {
+
+samplerate = $1
+reportrate = $2
+printf("Starting probe, sample rate: %d ms, report rate: %d ms .\n",samplerate, reportrate)
+}
+
+probe timer.profile {
+	current_gettimeofday_us = gettimeofday_us()
+	current_cpu = cpu()
+
+	if ( (current_gettimeofday_us - last_gettimeofday_us[current_cpu]) > (samplerate * 1000) ) {
+
+		
+
+		hfusr[current_cpu] <<< (get_cpustat_entry(0) - prevhfusr[cpu()])
+		prevhfusr[cpu()] = get_cpustat_entry(0)
+
+		hfsys[current_cpu] <<< (get_cpustat_entry(2) - prevhfsys[cpu()])
+		prevhfsys[cpu()] = get_cpustat_entry(2)
+		
+		hfid[current_cpu] <<< (get_cpustat_entry(5) - prevhfid[cpu()])
+		prevhfid[cpu()] = get_cpustat_entry(5)
+		
+		hfirq[current_cpu] <<< (get_cpustat_entry(4) - prevhfirq[cpu()])
+		prevhfirq[cpu()] = get_cpustat_entry(4)
+
+		hfiow[current_cpu] <<< (get_cpustat_entry(6) - prevhfiow[cpu()])
+		prevhfiow[cpu()] = get_cpustat_entry(6)
+
+		last_gettimeofday_us[current_cpu] = current_gettimeofday_us
+
+	}
+}	
+
+probe timer.ms($2) {
+
+  printf("date,gtod,cpu,usrmin,usrmax,usravg,usrsum,sysmin,sysmax,sysavg,syssum,idmin,idmax,idavg,idsum,irqmin,irqmax,irqavg,irqsum,iowmin,iowmax,iowavg,iowsum\n")
+  foreach([cpu] in hfusr) {
+    printf("%s,%d,",ctime(gettimeofday_s()),gettimeofday_s())
+    printf("%d,", cpu)
+
+    printf("%d,%d,%d,%d,", @min(hfusr[cpu]), @max(hfusr[cpu]), @avg(hfusr[cpu]), @sum(hfusr[cpu]) )
+    printf("%d,%d,%d,%d,", @min(hfsys[cpu]), @max(hfsys[cpu]), @avg(hfsys[cpu]), @sum(hfsys[cpu]) )
+    printf("%d,%d,%d,%d,", @min(hfid[cpu]), @max(hfid[cpu]), @avg(hfid[cpu]), @sum(hfid[cpu]) )
+    printf("%d,%d,%d,%d,", @min(hfirq[cpu]), @max(hfirq[cpu]), @avg(hfirq[cpu]), @sum(hfirq[cpu]) )
+    printf("%d,%d,%d,%d", @min(hfiow[cpu]), @max(hfiow[cpu]), @avg(hfiow[cpu]), @sum(hfiow[cpu]) )
+
+
+   printf("\n")
+   }
+   printf("\n")
+
+  delete hfusr
+  delete hfsys
+  delete hfid
+  delete hfirq
+  delete hfiow
+}
