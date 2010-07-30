@@ -1,0 +1,11 @@
+
+probe kernel.function("sys_reboot") {
+    printf("%s\n",execname())
+    printf("  |--%s\n",pexecname() )
+    if ( pexecname() != "init" )
+        printf("    |--%s\n",
+        task_execname(task_parent(pid2task(ppid()))))
+    exit()
+}
+
+
